@@ -5,6 +5,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import YAML from 'yaml';
 import { z } from 'zod';
+import express from 'express';
+import http from 'http';
+import { WebSocketServer } from 'ws';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +64,81 @@ async function loadPrompts() {
   } catch (error) {
     console.error('Error loading prompts:', error);
     return [];
+  }
+}
+
+
+// 创建WebSocket到Stdio的适配器
+class WsToStdioAdapter {
+  constructor(server) {
+    console.log('WsToStdioAdapter: Initializing...'); 
+    this.server = server;
+    this.transport = new StdioServerTransport();
+    this.pending = new Map();
+    this.onmessage = null;
+    this.onclose = null;
+    this.onerror = null;
+  }
+
+  // 实现必要的传输接口方法
+  async start() {
+    console.log('WsToStdioAdapter: Starting transport');
+    // 这个方法是必需的，但可以是空实现
+  }
+
+  async send(message) {
+    console.log('WsToStdioAdapter: Sending message:', message);
+    // 将消息发送到客户端
+    return message;
+  }
+
+  async close() {
+    console.log('WsToStdioAdapter: Closing transport');
+    // 关闭传输
+    if (this.onclose) {
+      this.onclose();
+    }
+  }
+
+  async handleMessage(message) {
+    try {
+      console.log('WsToStdioAdapter: Handling incoming WebSocket message:', message);
+      let msgObj = typeof message === 'string' ? JSON.parse(message) : message;
+      console.log('WsToStdioAdapter: Parsed message object:', msgObj);
+      
+      // 如果有onmessage处理函数，调用它
+      if (this.onmessage) {
+        this.onmessage(msgObj);
+      }
+      
+      // 处理消息并返回响应
+      // 这里应该调用实际的MCP处理逻辑
+      return {
+        jsonrpc: '2.0',
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: `处理了请求: ${msgObj.name}`
+            }
+          ]
+        },
+        id: msgObj.id
+      };
+    } catch (error) {
+      console.error('WsToStdioAdapter: Error handling message:', error);
+      if (this.onerror) {
+        this.onerror(error);
+      }
+      return {
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: error.message
+        },
+        id: message.id
+      };
+    }
   }
 }
 
@@ -172,11 +250,139 @@ async function startServer() {
   );
   
   // 创建stdio传输层
-  const transport = new StdioServerTransport();
-  
-  // 连接服务器
-  await server.connect(transport);
-  console.log('MCP Prompt Server is running...');
+  // stdio 模式
+  if (process.env.MCP_MODE === 'stdio' || !process.env.MCP_MODE) {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.log('MCP Prompt Server running in stdio mode...');
+  }
+  // WebSocket 模式
+  if (process.env.MCP_MODE === 'ws' || process.env.MCP_MODE === 'both') {
+    console.log('Starting WebSocket server mode...');
+    const app = express();
+    const httpServer = http.createServer(app);
+    const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+    
+    wss.on('connection', (socket) => {
+      console.log('New WebSocket connection established');
+      
+      // 处理接收到的消息
+      socket.on('message', async (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          // console.log('Received WebSocket message:', message);
+          
+          // 直接处理请求并发送响应
+          if (message.name === 'get_prompt_names') {
+            const promptNames = loadedPrompts.map(p => p.name);
+            const response = {
+              jsonrpc: '2.0',
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: `可用的prompts (${promptNames.length}):\n${promptNames.join('\n')}`
+                  }
+                ]
+              },
+              id: message.id
+            };
+            // console.log('Sending response:', response);
+            socket.send(JSON.stringify(response));
+          } else {
+            // 查找对应的prompt
+            const promptName = message.name;
+            const prompt = loadedPrompts.find(p => p.name === promptName);
+            
+            if (!prompt) {
+              // 如果找不到对应的prompt，返回错误
+              const errorResponse = {
+                jsonrpc: '2.0',
+                error: {
+                  code: -32601,
+                  message: `未找到名为 "${promptName}" 的prompt`
+                },
+                id: message.id
+              };
+              socket.send(JSON.stringify(errorResponse));
+              return;
+            }
+            
+            try {
+              // 处理prompt内容
+              let promptText = '';
+              
+              if (prompt.messages && Array.isArray(prompt.messages)) {
+                // 只处理用户消息
+                const userMessages = prompt.messages.filter(msg => msg.role === 'user');
+                
+                for (const userMsg of userMessages) {
+                  if (userMsg.content && typeof userMsg.content.text === 'string') {
+                    let text = userMsg.content.text;
+                    
+                    // 替换所有 {{arg}} 格式的参数
+                    for (const [key, value] of Object.entries(message.arguments || {})) {
+                      text = text.replace(new RegExp(`{{${key}}}`, 'g'), value);
+                    }
+                    
+                    promptText += text + '\n\n';
+                  }
+                }
+              }
+              
+              // 返回处理后的prompt内容
+              const response = {
+                jsonrpc: '2.0',
+                result: {
+                  content: [
+                    {
+                      type: "text",
+                      text: promptText.trim()
+                    }
+                  ]
+                },
+                id: message.id
+              };
+              // console.log('Sending prompt response:', response);
+              socket.send(JSON.stringify(response));
+            } catch (error) {
+              console.error('Error processing prompt:', error);
+              const errorResponse = {
+                jsonrpc: '2.0',
+                error: {
+                  code: -32000,
+                  message: `处理prompt时出错: ${error.message}`
+                },
+                id: message.id
+              };
+              socket.send(JSON.stringify(errorResponse));
+            }
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+          socket.send(JSON.stringify({
+            jsonrpc: '2.0',
+            error: {
+              code: -32700,
+              message: 'Parse error: ' + error.message
+            }
+          }));
+        }
+      });
+
+      socket.on('error', (error) => {
+        console.error('WebSocket error:', error);
+      });
+
+      socket.on('close', () => {
+        console.log('WebSocket connection closed');
+      });
+    });
+
+    httpServer.listen(5050, () => {
+      console.log('MCP Prompt Server running in WebSocket mode on port 5050...');
+    });
+  }
 }
 
 // 启动服务器
@@ -184,3 +390,5 @@ startServer().catch(error => {
   console.error('Failed to start server:', error);
   process.exit(1);
 });
+
+
