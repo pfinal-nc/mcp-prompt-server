@@ -1,4 +1,4 @@
-name: wechat_headline_generator
+name: gen_title
 description: 当用户需要为微信公众号文章创建吸引人的标题时，这个提示词可以帮助生成多个爆款标题选项，并提供详细的标题分析和使用建议
 arguments: []
 messages:
