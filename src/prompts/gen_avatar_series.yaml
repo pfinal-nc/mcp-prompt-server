@@ -1,0 +1,42 @@
+name: gen_avatar_series
+description: 生成可爱的动漫头像系列，包括小女孩和大叔两种风格
+arguments:
+  - name: character_type
+    description: 角色类型（小女孩/大叔）
+    required: true
+  - name: custom_description
+    description: 自定义描述（可选）
+    required: false
+messages:
+  - role: user
+    content:
+      type: text
+      text: |
+        请生成一个可爱的动漫头像。
+
+        {{#if character_type}}
+        角色类型：{{character_type}}
+        {{/if}}
+
+        {{#if custom_description}}
+        自定义描述：{{custom_description}}
+        {{/if}}
+
+        ## 预设角色描述
+
+        ### 小女孩风格：
+        一个可爱的动漫小女孩。黑色眼睛，戴圆框眼镜，耳朵上挂着黄色圆片耳环，手放在脸上，身穿蓝衣，白色背景，画面风格清新。
+
+        ### 大叔风格：
+        一个可爱动漫胖大叔，戴着帽子、眼镜，穿着花衬衫和短裤。他的肚子很大，看起来像是在努力地挺着肚子。
+
+        ## 生成要求
+
+        请根据指定的角色类型生成相应的头像，确保：
+        1. 画面风格统一，保持动漫可爱风格
+        2. 细节丰富，符合角色特征描述
+        3. 色彩搭配和谐，背景简洁
+        4. 表情生动，富有感染力
+        5. 整体构图平衡，适合作为头像使用
+
+        如果提供了自定义描述，请优先使用自定义描述进行生成。

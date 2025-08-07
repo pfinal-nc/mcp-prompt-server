@@ -1,0 +1,48 @@
+name: gen_business_card_photo
+description: 生成一只手（主要是拇指和食指）正捏着一张名片的 2:3 照片，名片设计成深色背景的计算机程序代码编辑器窗口界面
+arguments:
+  - name: name
+    description: 姓名
+    required: true
+  - name: title
+    description: 职位/头衔
+    required: true
+  - name: email
+    description: 邮箱地址
+    required: true
+  - name: link
+    description: 个人网站或链接
+    required: true
+messages:
+  - role: user
+    content:
+      type: text
+      text: |
+        帮我生成一只手（主要是拇指和食指）正捏着一张名片的 2:3 照片。
+
+        名片设计：这张卡片并非传统名片样式，而是设计成了一个深色背景的计算机程序代码编辑器的窗口界面。
+
+        窗口元素：
+        - 顶部：左上角有三个模拟窗口控制按钮（红、黄、绿），中间是窗口标题 `Business Card.json`。
+        - 工具栏：标题栏下方有一排小的图标，模拟编辑器工具栏。
+        - 代码区域：卡片的主要部分显示了带有行号（1-5可见）的代码。
+
+        代码区域的代码为：
+
+        {
+        "name": "{{name}}",
+        "title": "{{title}}",
+        "email": "{{email}}",
+        "link": "{{link}}"
+        }
+
+        背景：背景是模糊的，看起来像一个木质的桌面或表面。
+
+        整体风格：这张名片设计非常有创意和极客（geek）风格，暗示了名片主人可能从事 IT、软件开发或网络安全相关的工作。它用一种程序员熟悉的方式来展示个人联系信息。
+
+        请生成这张照片，确保：
+        1. 照片比例为 2:3
+        2. 手部细节清晰，特别是拇指和食指捏住名片的动作
+        3. 名片上的代码编辑器界面设计逼真
+        4. 代码内容准确显示提供的个人信息
+        5. 整体风格符合极客/程序员主题
