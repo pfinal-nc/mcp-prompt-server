@@ -36,6 +36,7 @@ PROMPT_NAMES = {
     "gen_knowledge_card_html": "知识卡片生成",
     "gen_knowledge_sharing_tweets": "知识分享推文生成",
     "gen_magazine_card_html": "杂志卡片生成",
+    "gen_nuxt_static_website": "Nuxt静态网站生成",
     "gen_mimeng_headline_title": "咪蒙标题生成",
     "gen_podcast_script": "播客脚本生成",
     "gen_prd_prototype_html": "PRD原型生成",
