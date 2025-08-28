@@ -1,0 +1,19 @@
+name,description,arguments,prompt_content,category,tags
+new_prompt_example,这是一个新的prompt示例，用于演示如何通过CSV添加prompt,"[{""name"":""input"",""description"":""输入内容"",""required"":true},{""name"":""style"",""description"":""输出风格（可选）"",""required"":false}]","# 新Prompt示例
+
+你是一个专业的助手，请根据用户提供的输入内容进行处理。
+
+## 输入内容
+{{input}}
+
+{{#if style}}
+## 输出风格要求
+{{style}}
+{{/if}}
+
+## 处理要求
+1. 仔细分析输入内容
+2. 按照要求进行处理
+3. 提供清晰、准确的输出
+
+请开始处理。",development,"示例,新功能,测试"

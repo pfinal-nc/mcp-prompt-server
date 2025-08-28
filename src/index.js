@@ -1,28 +1,86 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import YAML from 'yaml';
 import { z } from 'zod';
 import express from 'express';
 import http from 'http';
 import { WebSocketServer } from 'ws';
-
-// 获取当前文件的目录路径
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// 预设prompts的目录路径
-const PROMPTS_DIR = path.join(__dirname, 'prompts');
+import { parse } from 'csv-parse/sync';
+import { PROMPTS_DIR, CSV_FILE } from '../config/paths.js';
 
 // 存储所有加载的prompts
 let loadedPrompts = [];
 
 /**
- * 从prompts目录加载所有预设的prompt
+ * 从CSV文件加载所有预设的prompt
  */
-async function loadPrompts() {
+async function loadPromptsFromCSV() {
+  try {
+    // 检查CSV文件是否存在
+    if (!await fs.pathExists(CSV_FILE)) {
+      console.log('CSV文件不存在，尝试从YAML文件加载...');
+      return await loadPromptsFromYAML();
+    }
+    
+    // 读取CSV文件
+    const csvContent = await fs.readFile(CSV_FILE, 'utf8');
+    
+    // 解析CSV内容
+    const records = parse(csvContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    });
+    
+    // 转换CSV记录为prompt对象
+    const prompts = records.map(record => {
+      try {
+        // 解析arguments字段（JSON字符串）
+        let promptArgs = [];
+        if (record.arguments && record.arguments.trim()) {
+          promptArgs = JSON.parse(record.arguments);
+        }
+        
+        // 构建prompt对象
+        const prompt = {
+          name: record.name,
+          description: record.description,
+          arguments: promptArgs,
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: record.prompt_content
+              }
+            }
+          ],
+          category: record.category || 'general',
+          tags: record.tags ? record.tags.split(',').map(tag => tag.trim()) : []
+        };
+        
+        return prompt;
+      } catch (error) {
+        console.warn(`Warning: 解析prompt "${record.name}" 时出错:`, error.message);
+        return null;
+      }
+    }).filter(prompt => prompt !== null);
+    
+    loadedPrompts = prompts;
+    console.log(`从CSV文件加载了 ${prompts.length} 个prompts`);
+    return prompts;
+  } catch (error) {
+    console.error('Error loading prompts from CSV:', error);
+    console.log('回退到YAML文件加载...');
+    return await loadPromptsFromYAML();
+  }
+}
+
+/**
+ * 从YAML文件加载所有预设的prompt（原有方法）
+ */
+async function loadPromptsFromYAML() {
   try {
     // 确保prompts目录存在
     await fs.ensureDir(PROMPTS_DIR);
@@ -59,12 +117,20 @@ async function loadPrompts() {
     }
     
     loadedPrompts = prompts;
-    console.log(`Loaded ${prompts.length} prompts from ${PROMPTS_DIR}`);
+    console.log(`从YAML文件加载了 ${prompts.length} 个prompts`);
     return prompts;
   } catch (error) {
-    console.error('Error loading prompts:', error);
+    console.error('Error loading prompts from YAML:', error);
     return [];
   }
+}
+
+/**
+ * 从CSV或YAML文件加载所有预设的prompt
+ */
+async function loadPrompts() {
+  // 优先尝试从CSV加载，如果失败则回退到YAML
+  return await loadPromptsFromCSV();
 }
 
 
@@ -246,6 +312,97 @@ async function startServer() {
     },
     {
       description: "获取所有可用的prompt名称"
+    }
+  );
+  
+  // 添加管理工具 - 按分类获取prompts
+  server.tool(
+    "get_prompts_by_category",
+    {
+      category: z.string().describe("分类名称")
+    },
+    async (args) => {
+      const categoryPrompts = loadedPrompts.filter(p => p.category === args.category);
+      const promptNames = categoryPrompts.map(p => p.name);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${args.category} 分类下的prompts (${promptNames.length}):\n${promptNames.join('\n')}`
+          }
+        ]
+      };
+    },
+    {
+      description: "按分类获取prompts"
+    }
+  );
+  
+  // 添加管理工具 - 搜索prompts
+  server.tool(
+    "search_prompts",
+    {
+      keyword: z.string().describe("搜索关键词")
+    },
+    async (args) => {
+      const keyword = args.keyword.toLowerCase();
+      const matchedPrompts = loadedPrompts.filter(p => 
+        p.name.toLowerCase().includes(keyword) ||
+        p.description.toLowerCase().includes(keyword) ||
+        (p.tags && p.tags.some(tag => tag.toLowerCase().includes(keyword)))
+      );
+      const promptNames = matchedPrompts.map(p => p.name);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `搜索 "${args.keyword}" 的结果 (${promptNames.length}):\n${promptNames.join('\n')}`
+          }
+        ]
+      };
+    },
+    {
+      description: "搜索prompts"
+    }
+  );
+
+  // 添加管理工具 - 从CSV加载prompts
+  server.tool(
+    "load_prompts_from_csv",
+    {},
+    async () => {
+      await loadPromptsFromCSV();
+      return {
+        content: [
+          {
+            type: "text",
+            text: `成功从CSV文件加载了 ${loadedPrompts.length} 个prompts。`
+          }
+        ]
+      };
+    },
+    {
+      description: "从CSV文件加载所有预设的prompts"
+    }
+  );
+
+  // 添加管理工具 - 从YAML加载prompts
+  server.tool(
+    "load_prompts_from_yaml",
+    {},
+    async () => {
+      await loadPromptsFromYAML();
+      return {
+        content: [
+          {
+            type: "text",
+            text: `成功从YAML文件加载了 ${loadedPrompts.length} 个prompts。`
+          }
+        ]
+      };
+    },
+    {
+      description: "从YAML文件加载所有预设的prompts"
     }
   );
   

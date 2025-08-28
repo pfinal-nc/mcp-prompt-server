@@ -16,18 +16,26 @@
 ## 目录结构
 
 ```
-prompt-server/
-├── package.json         # 项目依赖和脚本
-├── src/                 # 源代码目录
-│   ├── index.js         # 服务器入口文件
-│   └── prompts/         # 预设prompt模板目录
-│       ├── code_review.yaml
-│       ├── api_documentation.yaml
-│       ├── code_refactoring.yaml
-│       ├── test_case_generator.yaml
-│       └── project_architecture.yaml
-└── README.md            # 项目说明文档
+mcp-prompt-server/
+├── 📁 config/                    # 配置文件目录
+│   └── paths.js                  # 路径配置文件
+├── 📁 data/                      # 数据文件目录
+│   └── prompts.csv               # CSV格式的prompts数据
+├── 📁 docs/                      # 文档目录
+├── 📁 examples/                  # 示例文件目录
+├── 📁 scripts/                   # 脚本目录（预留）
+├── 📁 src/                       # 源代码目录
+│   ├── index.js                  # 主服务器文件
+│   ├── csv-manager.js            # CSV管理工具
+│   └── prompts/                  # YAML格式的prompts（原始文件）
+├── 📁 tools/                     # 工具目录
+│   ├── add-prompt.js             # 交互式添加prompt工具
+│   └── test-csv.js               # CSV功能测试脚本
+├── package.json                  # 项目配置和依赖
+└── README.md                     # 项目说明文档
 ```
+
+详细的项目结构说明请参考 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
 
 ## 安装和使用
 
@@ -47,6 +55,24 @@ npm start
 服务器将在标准输入/输出上运行，可以被Cursor、Windsurf或其他MCP客户端连接。
 
 ## 添加新的Prompt模板
+
+### 方法一：使用CSV文件（推荐）
+
+现在您可以通过编辑 `data/prompts.csv` 文件来添加新的prompt模板，这是最简单的方法：
+
+1. 打开 `data/prompts.csv` 文件
+2. 在文件末尾添加新行
+3. 按照格式填写各个字段
+
+详细说明请参考 [docs/CSV_MANAGEMENT.md](docs/CSV_MANAGEMENT.md)
+
+### 方法二：使用交互式工具
+
+```bash
+npm run add-prompt
+```
+
+### 方法三：使用YAML文件（原有方式）
 
 您可以通过在`src/prompts`目录中添加新的YAML或JSON文件来创建新的prompt模板。每个模板文件应包含以下内容：
 
