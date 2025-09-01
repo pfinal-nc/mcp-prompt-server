@@ -51,6 +51,8 @@ PROMPT_NAMES = {
     "requirement_analyst": "需求分析大师",
     "software_development_expert": "软件开发专家",
     "market_positioning_expert": "细分市场定位大师",
+    "tech_doc_translator": "技术文档翻译助手",
+    "deep_thinking_arrow": "追本之箭",
     "test_case_generator": "测试用例生成",
     "text_rewrite_optimizer": "文本改写优化",
     "wechat_cover_image": "微信封面图生成",
